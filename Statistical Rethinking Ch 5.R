@@ -36,6 +36,7 @@
 
 library(rethinking)
 library(tidyverse)
+library(viridis)
 
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -226,6 +227,68 @@ sum(W_contrast < 0) / 1000
 # or lighter than the woman?
 # 82% heavier
 # 18% lighter
+
+# APPROACHING INDIRECT EFFECTS
+# allowing slope and intercept to differ between groups
+
+# Wi ~ Normal(mui, sd)
+# mui = a +b(Hi - Hbar)
+
+d %>%
+  ggplot() +
+  geom_point(aes(x = height, y = weight, color = as.character(male)), shape = 1) +
+  scale_color_viridis(discrete = TRUE, begin = 0.2, end = 0.7, option = "magma") +
+  geom_hline(yintercept = mean(d$weight), linetype = "dashed") +
+  geom_vline(xintercept = mean(d$height), linetype = "dashed") +
+  theme_minimal()
+# a linear regression of this data as a whole would necessarily pass through the 
+# place where the dotted lines meet
+
+
+# adding height term centers the data. This makes it easier to 
+# work with.
+# When the values are centered, alpha = expected weight at the 
+# expected height (alpha = average weight for average height)
+
+# to calculate, add sex supscript to the equation
+
+# mui = aSi + bSi(Hi - Hbar)
+# Si = sex of the ith person
+
+# a = [a1, a2] b = [b1, b2]
+# two intercepts, two slopes, one for each value of S
+
+# adding the variable alpha and beta result in:
+
+data("Howell1")
+d <- Howell1
+d <- d %>%
+  filter(age >= 18)
+dat <- d %>%
+  select(weight, height, male) %>%
+  mutate(W = weight) %>%
+  mutate(H = height) %>%
+  mutate(Hbar = mean(height)) %>%
+  mutate(S = male + 1)
+
+m_SHW <- quap(
+  alist(
+    W ~ dnorm(mu, sigma),
+    mu <- a[S] + b[S]*(H-Hbar),
+    a[S] ~ dnorm(60, 10),
+    b[S] ~ dunif(0,1),
+    sigma ~ dunif(0,10)
+  ), data = dat)
+
+# a visualization of the slopes (not recommmended for presentation!)
+
+d %>%
+  ggplot() +
+  geom_point(aes(x = height, y = weight, color = as.character(male)), shape = 1) +
+  scale_color_viridis(discrete = TRUE, begin = 0.3, end = 0.8, option = "magma") +
+  geom_smooth(aes(x = height, y = weight, color = as.character(male)), method = "lm",
+              se = FALSE, fullrange = TRUE) +
+  theme_minimal()
 
 ############### SUBSECTION HERE
 
