@@ -183,8 +183,62 @@ compute_posterior <- function( the_sample, poss = c(0, 0.25, 0.5, 0.75, 1))
   data.frame( poss, ways, post = round(post, 3), bars)
 }
 
-sample <- sim_globe(p = 0.35, N = 40)
+sample <- sim_globe(p = 0.35, N = 100)
 compute_posterior(sample, poss = seq( from = 0, to = 1, by = 0.1))
+
+###############
+
+# using grid approximation to generate posterior distribution
+# uses points along a continuum of probability and 'connects the dots'
+
+z <- 100
+# define grid (how fine scale?)
+p_grid <- seq(from = 0, to = 1, length.out = z)
+
+# define prior (choose 1)
+prior <- rep(1, z)
+prior <- ifelse(p_grid < 0.5, 0, 1)
+prior <- exp(-5*abs(p_grid - 0.5))
+
+# compute likelihood at each value in grid
+likelihood <- dbinom(35, size = 100, prob = p_grid)
+
+# compute product of likelihood and prior
+unstd_posterior <- likelihood * prior
+
+# standardize the posterior so it sums to 1
+posterior <- unstd_posterior / sum(unstd_posterior)
+
+# display to posterior distribution
+plot(p_grid, posterior, type = "b", xlab = "probability of water",
+     ylab = "posterior probability")
+mtext(paste(sum(z), "points"))
+
+###############
+
+# using the quadratic approximation to create the posterior distribution
+# (call 'quadratic', but essentially the same as 'Gaussian', uses 'hill climbing'
+# algorithm to find the peak, then calculates the curve from nearby values)
+
+globe_qa <- quap(
+  alist(
+    W ~ dbinom(W + L, p), # binomial likelihood
+    p ~ dunif(0, 1) # uniform prior
+  ),
+  data = list(W = 6, L = 3) # these are the observed tosses
+)
+precis(globe_qa)
+
+# knowing the posterior, use analytic calculation using the beta distribution
+# to quantify how good the quadratic approximation is
+
+# analytic curve
+W <- 6
+L <- 3
+curve(dbeta(x, W + 1, L + 1), from = 0, to = 1)
+# quadratic approximation
+curve(dnorm(x, 0.67, 0.16), lty = 2, add = TRUE)
+
 
 
 ###############
@@ -228,7 +282,103 @@ sample <- sim_globe2(p = p, N = N, x = x)
 compute_posterior(sample, poss = seq( from = 0, to = 1, by = 0.1)) # error
 # Any error term tends to pull the distribution toward the middle (0.5)
 
-############### SUBSECTION HERE
+###############
+
+# Markov Chain Monte Carlo MCMC is often the only viable way to calculate
+# posteriors when you have lots of parameters (esp multilevel models)
+
+n_samples <- 1000
+p <- rep(NA, n_samples)
+p[1] <- 0.5
+W <- 6
+L <- 3
+for(i in 2:n_samples) {
+  p_new <- rnorm(1, p[i - 1], 0.1)
+  if(p_new < 0) p_new <- abs(p_new)
+  if(p_new > 1) p_new <- 2 - p_new
+  q0 <- dbinom(W, W + L, p[i - 1])
+  q1 <- dbinom(W, W + L, p_new)
+  p[i] <- ifelse(runif(1) < q1/q0, p_new, p[i-1])
+}
+
+# compare MCMC with the analytical posterior
+dens(p, xlim = c(0,1))
+curve(dbeta(x, W + 1, L + 1), lty = 2, add = TRUE)
+
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# END OF CHAPTER EXERCISES                                                  ####
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+## 2M1: Compute and plot the grid approximation posterior for each of the following
+# sets of obeservations assuming a uniform prior for p
+# (1) W, W, W
+# (2) W, W, W, L
+# (3) L, W, W, L, W, W, W
+
+# run each set in the grid code below
+
+# (1) W, W, W
+W <- 3
+N <- 3
+
+# (2) W, W, W, L
+W <- 3
+N <- 4
+
+# (3) L, W, W, L, W, W, W
+W <- 5
+N <- 7
+
+# grid code with constant p
+z <- 100
+# define grid (how fine scale?)
+p_grid <- seq(from = 0, to = 1, length.out = z)
+
+# define prior (choose 1)
+prior <- rep(1, z)
+
+# compute likelihood at each value in grid
+likelihood <- dbinom(W, size = N, prob = p_grid)
+# dbinom(x, size, prob): x = observations of W, size = number of tosses, p = probability
+# here it's unknown so 50/50
+
+# compute product of likelihood and prior
+unstd_posterior <- likelihood * prior
+
+# standardize the posterior so it sums to 1
+posterior <- unstd_posterior / sum(unstd_posterior)
+
+# display to posterior distribution
+plot(p_grid, posterior, type = "b", xlab = "probability of water",
+     ylab = "posterior probability")
+mtext(paste(sum(z), "points"))
+
+
+## 2M2 same as above but with a prior for p that is p < 0.5 = 0 and p > 0.5 = 1
+
+# grid code fussy prior
+z <- 100
+# define grid (how fine scale?)
+p_grid <- seq(from = 0, to = 1, length.out = z)
+
+# define prior (choose 1)
+prior <- ifelse(p_grid < 0.5, 0, 1)
+
+# compute likelihood at each value in grid
+likelihood <- dbinom(W, size = N, prob = p_grid)
+# dbinom(x, size, prob): x = observations of W, size = number of tosses, p = probability
+# here it's unknown so 50/50
+
+# compute product of likelihood and prior
+unstd_posterior <- likelihood * prior
+
+# standardize the posterior so it sums to 1
+posterior <- unstd_posterior / sum(unstd_posterior)
+
+# display to posterior distribution
+plot(p_grid, posterior, type = "b", xlab = "probability of water",
+     ylab = "posterior probability")
+mtext(paste(sum(z), "points"))
 
 ####
 #<<<<<<<<<<<<<<<<<<<<<<<<<<END OF SCRIPT>>>>>>>>>>>>>>>>>>>>>>>>#
