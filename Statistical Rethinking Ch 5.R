@@ -279,6 +279,7 @@ m_SHW <- quap(
     b[S] ~ dunif(0,1),
     sigma ~ dunif(0,10)
   ), data = dat)
+precis(m_SHW)
 
 # a visualization of the slopes (not recommmended for presentation!)
 
@@ -289,6 +290,10 @@ d %>%
   geom_smooth(aes(x = height, y = weight, color = as.character(male)), method = "lm",
               se = FALSE, fullrange = TRUE) +
   theme_minimal()
+
+# But what we really want is the estimated difference between men and women
+# and any give height:
+
 
 ############### SUBSECTION HERE
 

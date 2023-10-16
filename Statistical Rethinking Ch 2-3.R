@@ -191,17 +191,15 @@ compute_posterior(sample, poss = seq( from = 0, to = 1, by = 0.1))
 # using grid approximation to generate posterior distribution
 # uses points along a continuum of probability and 'connects the dots'
 
-z <- 100
+z <- 1000
 # define grid (how fine scale?)
 p_grid <- seq(from = 0, to = 1, length.out = z)
 
 # define prior (choose 1)
 prior <- rep(1, z)
-prior <- ifelse(p_grid < 0.5, 0, 1)
-prior <- exp(-5*abs(p_grid - 0.5))
 
 # compute likelihood at each value in grid
-likelihood <- dbinom(35, size = 100, prob = p_grid)
+likelihood <- dbinom(6, size = 9, prob = p_grid)
 
 # compute product of likelihood and prior
 unstd_posterior <- likelihood * prior
@@ -209,10 +207,93 @@ unstd_posterior <- likelihood * prior
 # standardize the posterior so it sums to 1
 posterior <- unstd_posterior / sum(unstd_posterior)
 
-# display to posterior distribution
+# draw samples from the posterior
+samples <- sample(p_grid, prob = posterior, size = 1e4, replace= TRUE)
+
+# visualize the draws
+plot(samples)
+
+# plot the density estimate from the samples
+dens(samples)
+
+# compare to actual posterior distribution
 plot(p_grid, posterior, type = "b", xlab = "probability of water",
      ylab = "posterior probability")
 mtext(paste(sum(z), "points"))
+
+# typically you want to summarize the results from your posterior:
+# 1) intervals of defined boundaries
+# 2) questions about intervals of defined probability mass
+# 3) questions about point estimates
+
+# 1) intervals of defined boundaries
+# add up posterior probs where p < 0.5
+sum(posterior[p_grid < 0.5])
+# [1] 0.1718746
+# ~17% of the posterior is below 0.5
+# compare to the samples drawn below 0.5 (sum and divide by # of samples)
+sum(samples < 0.5)/ 1e4
+# [1] 0.1653
+# different because samples drawn are not exactly the 'ideal' distribution created
+# proportion between .5 and .75
+sum(samples > 0.5 & samples < 0.75) /1e4
+# [1] 0.6017
+
+# 2) invervals of defined mass
+# ? where is the boundary for the lower 80% of data? (easier to run on samples)
+quantile(samples, 0.8)
+#       80% 
+# 0.7617618
+# samples between the 10th and 90th percentiles
+quantile(samples, c(0.1, 0.9))
+#       10%       90% 
+# 0.4494494 0.8128128 
+# Describing intervals in this way becomes difficult when the distribution
+# is asymmetrical. For example, if we get three W from the 'world' example:
+p_grid <- seq(from = 0, to = 1, length.out = 1000)
+prior <- rep(1, 1000)
+likelihood <- dbinom(3, size = 3, prob = p_grid)
+posterior <- likelihood * prior
+posterior <- posterior / sum(posterior)
+samples <- sample(p_grid, size = 1e4, replace = TRUE, prob = posterior)
+# view the plot
+plot(samples)
+dens(samples)
+# extract compatibility interval of middle 50% of density
+PI(samples, prob = 0.5)
+#       25%       75% 
+# 0.7067067 0.9319319
+# this interval is misleading because it excludes the most plausible values
+# closer to 1 given the sample
+# a better value is the Highest Posterior Density Interval (HPDI) = the narrowest
+# interval containing the specified probability mass 
+HPDI(samples, prob = 0.5)
+# now it captures the 50% that reside within the highest probabilities
+# HPDI is computationally more intensive has 'simulation variance' (it is 
+# sensitive to how many samples you draw from the posterior)
+
+# 3) point estimates (not recommended)
+# what is the value with the highest probability (maximum a posteriori - MAP)?
+p_grid[which.max(posterior)]
+# [1] 1
+# or from the samples:
+chainmode(samples, adj = 0.01) # the mode
+# [1] 0.9845318
+mean(samples) # the mean
+# [1] 0.8008744
+median(samples) # the median
+# [1] 0.8448448
+# But which to use? A loss function can help choose. It penalizes the various
+# points based on how far they are from the correct answer
+# This is theoretically set at 0.5 in this example:
+sum(posterior*abs(0.5-p_grid)) # gives what the expected average loss will be:
+# [1] 0.3128752
+# to run over all possible values use sapply:
+loss <- sapply(p_grid, function(d) sum(posterior*abs(d-p_grid)))
+# now the object 'loss' contains all the loss values for each decision
+# find the lowest with:
+p_grid[which.min(loss)]
+# [1] 0.8408408 # very close to the median
 
 ###############
 
@@ -379,6 +460,26 @@ posterior <- unstd_posterior / sum(unstd_posterior)
 plot(p_grid, posterior, type = "b", xlab = "probability of water",
      ylab = "posterior probability")
 mtext(paste(sum(z), "points"))
+
+## 2M3:
+# Assume 2 globes, Earth and Mars. Earth = 70% water, Mars = 100% land.
+# One globe is tossed, don't know which one, and an L is produced. 
+# Probability of which globe thrown is 0.5. Show the posterior prob
+# that the tossed globed was Earth conditional on seeing land
+# Pr(Earth|land) is 0.23.
+
+# Pr(land|Earth) = 1-0.7 = 0.3
+# Pr(land|Mars) = 1
+
+# Pr(Earth) = 0.5
+# Pr(Mars) = 0.5
+
+# Pr(Earth|land) = Pr(land|Earth)*Pr(Earth) / Pr(land)
+
+# Pr(Earth|land) = Pr(land|Earth)*Pr(Earth) / Pr(land|Earth)*Pr(Earth) + Pr(land|Mars)*Pr(Mars)
+# Pr(Earth|land) = 0.3 * 0.5 / 0.3 * 0.5 + 1 * 0.5
+(0.3*0.5)/(0.3*0.5 + 1*0.5)
+[1] 0.2307692
 
 ####
 #<<<<<<<<<<<<<<<<<<<<<<<<<<END OF SCRIPT>>>>>>>>>>>>>>>>>>>>>>>>#
