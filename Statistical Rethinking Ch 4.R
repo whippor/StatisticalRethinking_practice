@@ -48,6 +48,7 @@ library(tidyverse)
 # IN TEXT EXERCISES                                                         ####
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+############## LECTURES
 
 # GENERAL WORKFLOW
 # 1) state clear question
@@ -221,6 +222,54 @@ W_postpred <- sim( m3.2,
 W_PI <- apply(W_postpred, 2, PI)
 lines(height_seq, W_PI[1,], lty = 2, lwd = 2)
 lines(height_seq, W_PI[2,], lty = 2, lwd = 2)
+
+
+############## TEXT
+
+# the utility of the gaussian distribution
+
+# NORMAL BY ADDITION
+# a coin flip by 1000 = left or right step on football field. Most people would 
+# be close the middle after 16 flips. This is not specific to coin flips.
+# generate random numbers between -1 and 1 that dictate direction of people
+# replicate 1000 times and sum them up
+pos <- replicate(1000, sum(runif(16, -1, 1)))
+hist(pos)
+plot(density(pos))
+# this holds true for any distribution that you randomly sample from. It will
+# always approach a bell curve. Here is the poisson distribution:
+hist(rpois(10000, 4))
+pos <- replicate(1000, sum(rpois(16, 4)))
+hist(pos)
+plot(density(pos))
+# gamma distribution
+hist(rgamma(100, shape = 3))
+pos <- replicate(1000, sum(rgamma(100, shape = 3)))
+hist(pos)
+plot(density(pos))
+
+# NORMAL BY MULTIPLICATION
+# imagine a multiplicative relationship between 12 loci and various alleles
+# that increase growth by a percentage in an organism. Sample random growth rate:
+prod(1 + runif(12,0, 0.1)) # samples 12 random numbers between 1 and 1.1 and all
+# 12 are multiplied together
+# generate 10000 runs:
+growth <- replicate(10000, prod(1 + runif(12, 0, 0.1)))
+dens(growth, norm.comp = TRUE)
+# smaller deviation values tend to create better approximations (nearly additive)
+big <- replicate(10000, prod(1+runif(12,0,0.5)))
+dens(big, norm.comp = TRUE)
+small <- replicate(10000, prod(1+runif(12,0,0.01)))
+dens(small, norm.comp = TRUE)
+
+# BUT large values do approximate the normal when logged :)
+log_big <- replicate(10000, log(prod(1+runif(12,0,0.5))))
+dens(log_big, norm.comp = TRUE)
+
+# DEFINITION: probability distributions with discrete outcomes = probability
+# mass functions (Pr). Continuous probabilty functions = probability density
+# functions (p OR f)
+# Tau (T) = 1/sd^2 -> used in some bayesian programming packages instead of sd
 
 ############### SUBSECTION HERE
 

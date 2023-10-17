@@ -4,7 +4,7 @@
 # Script created 2023-10-06                                                   ##
 # Data source: Richard McElreath - Statistical Rethinking 2nd ed.             ##
 # R code prepared by Ross Whippo                                              ##
-# Last updated 2023-10-10                                                     ##
+# Last updated 2023-10-16                                                     ##
 #                                                                             ##
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -295,6 +295,47 @@ loss <- sapply(p_grid, function(d) sum(posterior*abs(d-p_grid)))
 p_grid[which.min(loss)]
 # [1] 0.8408408 # very close to the median
 
+## GENERATING 'DUMMY DATA' TO TEST A MODEL
+# Using the globe example
+# N = number of tosses
+# you need the number of water observations possible (3: 0, 1, or 2 water obs)
+# give some probability of W (here, 0.7)
+dbinom(0:2, size = 2, prob = 0.7)
+# [1] 0.09 0.42 0.49 (9% chance 0, 42% chance 1, 49% chance 3)
+# Now sample from that distribution:
+rbinom(1, size = 2, prob = 0.7)
+# [1] 1 (means that sample taken was 1 water in 2 tosses)
+# run 10 simulations
+rbinom(10, size = 2, prob = 0.7)
+#  [1] 2 2 2 1 1 2 2 2 1 1
+# now 100,000 simulations
+dummy_w <- rbinom(1e5, size = 9, prob = 0.7)
+table(dummy_w)/1e5
+simplehist(dummy_w, xlab = "dummy water count")
+#       0       1       2 
+# 0.09036 0.42096 0.48868 # closely matches the distribution
+
+## POSTERIOR PREDICTIVE DISTRIBUTION
+# the sampling distribution of outcomes for each value of p, averaged across
+# all predictions using the posterior of each p
+
+# how to do this:
+# generate predicted observations for each p
+w <- rbinom(1e4, size = 9, prob = 0.6) # simulated predictions for 0.6 (single value)
+simplehist(w)
+# to do this for all p in the posterior, use the samples from the posterior (all values)
+p_grid <- seq(from = 0, to = 1, length.out = 1000)
+prior <- rep(1, 1000)
+likelihood <- dbinom(6, size = 10, prob = p_grid)
+posterior <- likelihood * prior
+posterior <- posterior/sum(posterior)
+samples <- sample(p_grid, size = 1e4, replace = TRUE, prob = posterior)
+w <- rbinom(1e4, size = 9, prob = samples)
+
+plot(samples)
+simplehist(w)
+
+
 ###############
 
 # using the quadratic approximation to create the posterior distribution
@@ -480,6 +521,186 @@ mtext(paste(sum(z), "points"))
 # Pr(Earth|land) = 0.3 * 0.5 / 0.3 * 0.5 + 1 * 0.5
 (0.3*0.5)/(0.3*0.5 + 1*0.5)
 [1] 0.2307692
+
+###############
+
+## Chapter 3
+
+# Use this code to generate answers for 'sample':
+p_grid <- seq(from = 0, to = 1, length.out = 1000)
+prior <- rep(1, 1000)
+likelihood <- dbinom(6, size = 9, prob = p_grid)
+posterior <- likelihood * prior
+posterior <- posterior/sum(posterior)
+set.seed(100)
+samples <- sample(p_grid, prob = posterior, size = 1e4, replace = TRUE)
+plot(samples)
+hist(samples)
+
+## 3E1 How much posterior probability lies below p = 0.2
+sum(samples < 0.2)/1e4
+# [1] 0.004
+
+## 3E2 How much posterior probability lies above p = 0.8
+sum(samples > 0.8)/1e4
+# [1] 0.1116
+
+## 3E3 How much probability lies between p = 0.2 and p = 0.8
+sum(samples > 0.2 & samples < 0.8)/1e4
+# [1] 0.888
+
+## 3E4 20% of the posterior probability lies below which value of p
+quantile(samples, 0.2)
+#       20% 
+# 0.5185185
+
+## 3E5 20% of the posterior lies above what value of p
+quantile(samples, 0.8)
+#       80% 
+# 0.7557558
+
+## 3E6 which values of p contain narrowest interval = to 66% of the probability
+HPDI(samples, prob = 0.66)
+#    |0.66     0.66| 
+# 0.5085085 0.7737738 
+
+## 3E7 which values contain 66% of the posterior prob assuming equal distribution
+# above and below the interval
+PI(samples, prob = 0.66)
+#       17%       83% 
+# 0.5025025 0.7697698 
+
+## 3M1 construct grid approximation for globe data w/ tosses W = 8, N = 15
+p_grid <- seq(from = 0, to = 1, length.out = 100)
+prior <- rep(1, 100)
+likelihood <- dbinom(8, size = 15, prob = p_grid)
+posterior <- likelihood * prior
+posterior <- posterior/sum(posterior)
+plot(posterior ~ p_grid, type = "l")
+
+## 3M2 draw 100,000 samples from this grid. use the samples to calculate
+# the 90% HPDI for p
+samples <- sample(p_grid, prob = posterior, size = 1e4, replace = TRUE)
+HPDI(samples, prob = 0.9)
+#      |0.9      0.9| 
+# 0.3434343 0.7272727
+
+## 3M3 construct a posterior predictive check for the model and data
+# simulate samples, average over posterior any uncertainty in p. What is
+# the probability of observing 8 water in 15 tosses?
+samples <- sample(p_grid, size = 1e4, replace = TRUE, prob = posterior)
+w <- rbinom(1e5, size = 15, prob = samples)
+
+plot(samples)
+simplehist(w) # shows frequency of W for 100,000 trials
+
+sum(w == 8)/length(w)
+# [1] 0.1447 # 14% chance of seeing 8 draws of W for 15 total draws
+
+## 3M4 Using the posterior from the 8/15 data, calculate the probability
+# of observing 6 W in 9 tosses
+w <- rbinom(1e5, size = 9, prob = samples)
+simplehist(w)
+sum(w == 6)/length(w)
+# [1] 0.17644 # 17% chance of seeing 6 W in 9 tosses
+
+## 3M5  begin at 3M1 but use prior that is zero below p = 0.5 and a constant
+# above p = 0.5. This simulates prior knowledge that the Earth's surface
+# is > 50% water. Redo all the steps above
+
+# construct grid approximation for globe data w/ tosses W = 8, N = 15
+p_grid <- seq(from = 0, to = 1, length.out = 100)
+prior <- ifelse(p_grid < 0.5, 0, 1)
+likelihood <- dbinom(8, size = 15, prob = p_grid)
+posterior <- likelihood * prior
+posterior <- posterior/sum(posterior)
+plot(posterior ~ p_grid, type = "l")
+
+# draw 100,000 samples from this grid. use the samples to calculate
+# the 90% HPDI for p
+samples <- sample(p_grid, prob = posterior, size = 1e5, replace = TRUE)
+HPDI(samples, prob = 0.9)
+#      |0.9      0.9| 
+# 0.5050505 0.7171717 
+
+# construct a posterior predictive check for the model and data
+# simulate samples, average over posterior any uncertainty in p. What is
+# the probability of observing 8 water in 15 tosses?
+samples <- sample(p_grid, size = 1e4, replace = TRUE, prob = posterior)
+w <- rbinom(1e5, size = 15, prob = samples)
+
+plot(samples)
+simplehist(w) # shows frequency of W for 100,000 trials
+
+sum(w == 8)/length(w)
+# [1] 0.1598 # 16% chance of seeing 8 draws of W for 15 total draws
+
+# Using the posterior from the 8/15 data, calculate the probability
+# of observing 6 W in 9 tosses
+w <- rbinom(1e5, size = 9, prob = samples)
+simplehist(w)
+sum(w == 6)/length(w)
+# [1] 0.23209 # 23% chance of seeing 6 W in 9 tosses
+
+## 3M6 you want the 99% percentile interval of the posterior to be only
+# 0.05 wide. How many times would you have to toss the globe to do it?
+
+# INFINITY times
+
+# use this data for hard questions
+data(homeworkch3)
+# birth1 = sex of first born (M = 1, F = 0)
+# birth2 = sex of second born (order is same for datasets by family)
+
+## 3H1 grid approximate posterior of a birth being a boy, assume uniform
+# prior, which paramater maximizes posterior prob?
+p_grid <- seq(from = 0, to = 1, length.out = 1000)
+prior <- rep(1, 1000)
+likelihood <- dbinom(111, size = 200, prob = p_grid)
+posterior <- likelihood * prior
+posterior <- posterior/sum(posterior)
+plot(posterior ~ p_grid, type = "l")
+abline(v = 0.5, lty = 2)
+# what is the value with the highest probability (maximum a posteriori - MAP)?
+p_grid[which.max(posterior)]
+# [1] 0.5545546
+
+
+## 3H2 pull 10,000 samples and find 50, 89, and 97% highest posterior density intervals
+samples <- sample(p_grid, prob = posterior, size = 1e4, replace = TRUE)
+HPDI(samples, prob = 0.5)
+#      |0.5      0.5| 
+# 0.5305305 0.5755756 
+HPDI(samples, prob = 0.89)
+#     |0.89     0.89| 
+# 0.4964965 0.6076076 
+HPDI(samples, prob = 0.97)
+#     |0.97     0.97| 
+# 0.4754755 0.6266266 
+
+## 3H3 use rbinom to simulate 10,000 reps of 200 births compare distributions
+# to the actual count of 111 boys for 200 births
+samples <- sample(p_grid, size = 1e4, replace = TRUE, prob = posterior)
+bsim <- rbinom(1e4, size = 200, prob = samples)
+dens(bsim, adj = 0.1)
+abline(v=sum(birth1) + sum(birth2), col = "red")
+
+## 3H4 Now simulate births from the first borns only (birth1)
+b1sim <- rbinom(1e4, size = 100, prob = samples)
+dens(b1sim, adj = 0.1)
+abline(v=sum(birth1), col = "red")
+
+## 3H5 check assumption that first and second borns is independent. Focus on
+# second births that followed female first borns. Compare 10,000 sim counts
+# of boys to only those to only those second births that followed girls
+
+# number of boys born after girls
+b01 <- birth2[birth1==0]
+b01sim <- rbinom(1e4, size = length(b01), prob = samples)
+dens(b01sim, adj = 0.1)
+abline(v = sum(b01), col = "red")
+
+
 
 ####
 #<<<<<<<<<<<<<<<<<<<<<<<<<<END OF SCRIPT>>>>>>>>>>>>>>>>>>>>>>>>#
@@ -931,3 +1152,6 @@ mtext("100 points")
 # the 99th percentile interval of the posterior distribution of p to be only
 # 0.05 wide? This means the distance between upper and lower bound should only
 # be 0.05. How many times will you have to toss the globe?
+rm()
+
+
